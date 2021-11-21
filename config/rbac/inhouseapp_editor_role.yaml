@@ -1,0 +1,24 @@
+# permissions for end users to edit inhouseapps.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: inhouseapp-editor-role
+rules:
+- apiGroups:
+  - myplatform.dexterposh.github.io
+  resources:
+  - inhouseapps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - myplatform.dexterposh.github.io
+  resources:
+  - inhouseapps/status
+  verbs:
+  - get

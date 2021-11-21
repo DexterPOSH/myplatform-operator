@@ -43,7 +43,8 @@ Quick look of the `main.go` file shows the code that initializes and runs the Ma
 ### Create an API & Controller
 
 ```bash
-operator-sdk create api --group=dev --version=v1alpha1 --kind=MyPlatform
+# Use the cli to boostrap the api and controller
+operator-sdk create api --group=myplatform --version=v1alpha1 --kind=InhouseApp
 ```
 
 Run below to update the generated code whenever the *_types.go files are modified.

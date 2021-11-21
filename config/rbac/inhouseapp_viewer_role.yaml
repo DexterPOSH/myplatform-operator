@@ -1,0 +1,20 @@
+# permissions for end users to view inhouseapps.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: inhouseapp-viewer-role
+rules:
+- apiGroups:
+  - myplatform.dexterposh.github.io
+  resources:
+  - inhouseapps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - myplatform.dexterposh.github.io
+  resources:
+  - inhouseapps/status
+  verbs:
+  - get
