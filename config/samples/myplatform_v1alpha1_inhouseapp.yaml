@@ -1,0 +1,7 @@
+apiVersion: myplatform.dexterposh.github.io/v1alpha1
+kind: InhouseApp
+metadata:
+  name: inhouseapp-sample
+spec:
+  # Add fields here
+  foo: bar
