@@ -20,6 +20,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	Organization = "dexterposh"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -28,14 +32,42 @@ type InhouseAppSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of InhouseApp. Edit inhouseapp_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// AppId uniquely identifies an app on MyPlatform
+	AppId string `json:"appId"`
+
+	// Language mentions the programming language for the app on the platform
+	// +kubebuilder:validation:Enum=csharp;python;go
+	Language string `json:"language"`
+
+	// OS specifies the type of Operating System
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=windows;linux
+	// +kubebuilder:default:=linux
+	OS string `json:"os"`
+
+	// InstanceSize is the T-Shirt size for the deployment
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=small;medium;large
+	// +kubebuilder:default:=small
+	InstanceSize string `json:"instanceSize"`
+
+	// EnvironmenType specifies the type of environment
+	// +kubebuilder:validation:Enum=dev;test;prod
+	EnvironmentType string `json:"environmentType"`
+
+	// Replicas indicate the replicas to mantain
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas"`
 }
 
 // InhouseAppStatus defines the observed state of InhouseApp
 type InhouseAppStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Pods are the name of the Pods hosting the App
+	Pods []string `json:"pods"`
 }
 
 //+kubebuilder:object:root=true

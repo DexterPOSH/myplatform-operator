@@ -18,8 +18,14 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,8 +56,129 @@ func (r *InhouseAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	_ = log.FromContext(ctx)
 
 	// your logic here
+	logger := log.Log.WithValues("inhouseApp", req.NamespacedName)
+
+	logger.Info("InhouseApp Reconcile method...")
+
+	// fetch the inhouseApp CR instance
+	inhouseApp := &myplatformv1alpha1.InhouseApp{}
+	err := r.Get(ctx, req.NamespacedName, inhouseApp)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			logger.Info("InhouseApp resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		logger.Error(err, "Failed to get InhouseApp instance")
+		return ctrl.Result{}, err
+	}
+
+	// check if the deployment already exists, if not create a new one
+	found := &appsv1.Deployment{}
+	err = r.Get(ctx, types.NamespacedName{Name: inhouseApp.Name, Namespace: inhouseApp.Namespace}, found)
+	if err != nil && errors.IsNotFound(err) {
+		// define a new deployment
+		dep := r.deploymentForInhouseApp(inhouseApp) // deploymentForInhouseApp() returns a deployme
+		logger.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		err = r.Create(ctx, dep)
+		if err != nil {
+			logger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			return ctrl.Result{}, err
+		}
+		// deployment created, return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		logger.Error(err, "Failed to get Deployment")
+		// Reconcile failed due to error - requeue
+		return ctrl.Result{}, err
+	}
+
+	// This point, we have the deployment object created
+	// Ensure the deployment size is same as the spec
+	replicas := inhouseApp.Spec.Replicas
+	if *found.Spec.Replicas != replicas {
+		found.Spec.Replicas = &replicas
+		err = r.Update(ctx, found)
+		if err != nil {
+			logger.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		// Spec updated return and requeue
+		// Requeue for any reason other than an error
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Update the InhouseApp status with pod names
+	// List the pods for this InhouseApp's deployment
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(inhouseApp.Namespace),
+		client.MatchingLabels(inhouseApp.GetLabels()),
+	}
+
+	if err = r.List(ctx, podList, listOpts...); err != nil {
+		logger.Error(err, "Falied to list pods", "InhouseApp.Namespace", inhouseApp.Namespace, "InhouseApp.Name", inhouseApp.Name)
+		return ctrl.Result{}, err
+	}
+	podNames := getPodNames(podList.Items)
+
+	// Update status.Pods if needed
+	if !reflect.DeepEqual(podNames, inhouseApp.Status.Pods) {
+		inhouseApp.Status.Pods = podNames
+		err := r.Update(ctx, inhouseApp)
+		if err != nil {
+			logger.Error(err, "Failed to update InhouseApp status")
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *InhouseAppReconciler) deploymentForInhouseApp(m *myplatformv1alpha1.InhouseApp) *appsv1.Deployment {
+	ls := m.GetLabels()
+	replicas := m.Spec.Replicas
+
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: "dexterposh/myappp-dev", //hard-coded here, make this dynamic
+						Name:  "inhouseAppDeployment",  //hard-coded here, make this dynamic
+						Ports: []corev1.ContainerPort{{
+							ContainerPort: 8080,
+							Name:          "http",
+						}},
+					}},
+				},
+			},
+		},
+	}
+	ctrl.SetControllerReference(m, deploy, r.Scheme)
+	return deploy
+}
+
+// Utility function to iterate over pods and return the names slice
+func getPodNames(pods []corev1.Pod) []string {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return podNames
 }
 
 // SetupWithManager sets up the controller with the Manager.
